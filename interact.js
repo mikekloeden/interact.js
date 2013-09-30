@@ -23,7 +23,8 @@ var document      = window.document,
     console       = window.console,
     SVGElement    = window.SVGElement    || blank,
     SVGSVGElement = window.SVGSVGElement || blank,
-    HTMLElement   = window.HTMLElement   || window.Element,
+    Element       = window.Element       || blank,
+    HTMLElement   = window.HTMLElement   || Element,
 
     // Previous interact move event pointer position
     prevX       = 0,
@@ -99,7 +100,7 @@ var document      = window.document,
         },
         autoScrollEnabled: true,
 
-        origin      : { x: 0, y: 0 },
+        origin      : { x: 0, y: 0 }
     },
 
     snapStatus = {
@@ -272,13 +273,6 @@ var document      = window.document,
         supportsTouch &&
         navigator.userAgent.match('Presto'),
 
-    // prefix matchesSelector
-    matchesSelector = 'matchesSelector' in Element.prototype?
-            'matchesSelector': 'webkitMatchesSelector' in Element.prototype?
-                'webkitMatchesSelector': 'mozMatchesSelector' in Element.prototype?
-                    'mozMatchesSelector': 'oMatchesSelector' in Element.prototype?
-                        'oMatchesSelector': 'msMatchesSelector',
-
     // will be polyfill function if browser is IE8
     IE8MatchesSelector,
 
@@ -295,7 +289,7 @@ var document      = window.document,
     // Events wrapper
     events = (function () {
         /* jshint -W001 */ // ignore warning about setting IE8 Event#hasOwnProperty
-        var Event = window.Event,
+        var Event = window.Event || blank,
             useAttachEvent = 'attachEvent' in window && !('addEventListener' in window),
             addEvent = !useAttachEvent?  'addEventListener': 'attachEvent',
             removeEvent = !useAttachEvent?  'removeEventListener': 'detachEvent',
@@ -326,6 +320,7 @@ var document      = window.document,
             return -1;
             };
         }
+
         if (!('stopPropagation' in Event.prototype)) {
             Event.prototype.stopPropagation = function () {
                 this.cancelBubble = true;
@@ -367,6 +362,11 @@ var document      = window.document,
 
                 if (useAttachEvent) {
                     ret = element[addEvent](on + type, function (event) {
+                        if (Event === blank) {
+                            event.stopPropagation = Event.stopPropagation;
+                            event.stopImmediatePropagation = Event.stopPropagation;
+                            event.preventDefault = Event.preventDefault;
+                        }
                         if (!event.immediatePropagationStopped) {
                             event.target = event.srcElement;
                             event.currentTarget = element;
@@ -705,7 +705,7 @@ var document      = window.document,
 
                 for (i = 0; i < selectorDZs.length; i++) {
                     var selector = selectorDZs[i],
-                        nodeList = document.querySelectorAll(selector.selector);
+                        nodeList = Sizzle(selector.selector);
 
                     for (var j = 0, len = nodeList.length; j < len; j++) {
                         selector._element = nodeList[j];
@@ -928,10 +928,8 @@ var document      = window.document,
                 matches = [];
 
                 for (selector in selectors) {
-                    elements = Element.prototype[matchesSelector] === IE8MatchesSelector?
-                        document.querySelectorAll(selector): undefined;
 
-                    if (element[matchesSelector](selector, elements)) {
+                    if (Sizzle.matchesSelector(element, selector)) {
                         selectors[selector]._element = element;
                         matches.push(selectors[selector]);
                     }
@@ -1022,7 +1020,7 @@ var document      = window.document,
             snapStatus.x = null;
             snapStatus.y = null;
 
-            event.preventDefault();
+            event.preventDefault && event.preventDefault();
         }
     }
 
@@ -1276,7 +1274,7 @@ var document      = window.document,
     }
 
     function dragMove (event) {
-        event.preventDefault();
+        event.preventDefault && event.preventDefault();
 
         var dragEvent,
             dragEnterEvent,
@@ -1291,7 +1289,7 @@ var document      = window.document,
             if (!dynamicDrop) {
                 calcRects(dropzones);
                 for (var i = 0; i < selectorDZs.length; i++) {
-                    selectorDZs[i]._elements = document.querySelectorAll(selectorDZs[i].selector);
+                    selectorDZs[i]._elements = Sizzle(selectorDZs[i].selector)[0];
                 }
             }
         }
@@ -1338,7 +1336,7 @@ var document      = window.document,
     }
 
     function resizeMove (event) {
-        event.preventDefault();
+        event.preventDefault && event.preventDefault();
 
         var resizeEvent;
 
@@ -1360,7 +1358,7 @@ var document      = window.document,
         if (event.touches.length < 2) {
             return;
         }
-        event.preventDefault();
+        event.preventDefault && event.preventDefault();
 
         var gestureEvent;
 
@@ -1419,7 +1417,7 @@ var document      = window.document,
         for (var selector in selectors) {
             if (selectors.hasOwnProperty(selector)
                 && selectors[selector]
-                && event.target[matchesSelector](selector)) {
+                && Sizzle.matchesSelector(event.target, selector)) {
 
                 selectors[selector]._element = event.target;
                 curMatches.push(selectors[selector]);
@@ -1440,7 +1438,7 @@ var document      = window.document,
                 events.addToElement(event.target, 'mousemove', pointerHover);
             }
             else if (target) {
-                var prevTargetChildren = prevTargetElement.querySelectorAll('*');
+                var prevTargetChildren = Sizzle('*', prevTargetElement)[0];
 
                 if (Array.prototype.indexOf.call(prevTargetChildren, event.target) !== -1) {
 
@@ -1502,7 +1500,7 @@ var document      = window.document,
             }
         }
         else {
-            event.preventDefault();
+            event.preventDefault && event.preventDefault();
         }
     }
 
@@ -1561,9 +1559,7 @@ var document      = window.document,
             var click = {};
 
             for (var prop in event) {
-                if (event.hasOwnProperty(prop)) {
-                    click[prop] = event[prop];
-                }
+                click[prop] = event[prop];
             }
             click.type = 'click';
             target.fire(click);
@@ -1639,7 +1635,7 @@ var document      = window.document,
         if (typeof element === 'string') {
             // if the selector is invalid,
             // an exception will be raised
-            document.querySelector(element);
+            Sizzle(element)[0];
             selectors[element] = this;
             this.selector = element;
         }
@@ -1898,7 +1894,7 @@ var document      = window.document,
                        margin   : defaults.margin,
                        distance : defaults.distance,
                        interval : defaults.interval,
-                       container: defaults.container,
+                       container: defaults.container
                    };
                 }
 
@@ -2802,27 +2798,9 @@ var document      = window.document,
     // For IE's lack of Event#preventDefault
     events.add(docTarget,    'selectstart', function (e) {
         if (dragging || resizing || gesturing) {
-            e.preventDefault();
+            event.preventDefault && e.preventDefault();
         }
     });
-
-    // For IE8's lack of an Element#matchesSelector
-    if (!(matchesSelector in Element.prototype) || typeof (Element.prototype[matchesSelector]) !== 'function') {
-        Element.prototype[matchesSelector] = IE8MatchesSelector = function (selector, elems) {
-            // http://tanalin.com/en/blog/2012/12/matches-selector-ie8/
-            // modified for better performance
-            elems = elems || this.parentNode.querySelectorAll(selector);
-            count = elems.length;
-
-            for (var i = 0; i < count; i++) {
-                if (elems[i] === this) {
-                    return true;
-                }
-            }
-
-            return false;
-        };
-    }
 
     return interact;
 } ());
